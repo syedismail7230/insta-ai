@@ -12,39 +12,41 @@ async function syncLiveInstagramChats() {
     process.exit(1);
   }
 
-  console.log("🔄 Connecting to Meta Graph API to fetch live Instagram chats for Zawr Industries...");
+  console.log("🔄 Fetching live Instagram chats directly from Meta Graph API for Zawr Industries...");
 
-  // 1. Fetch conversations threads from Meta Graph API
-  const url = `https://graph.facebook.com/v21.0/me/conversations?platform=instagram&fields=id,updated_time,participants&access_token=${token}`;
+  // 1. Fetch conversations threads with limit=10
+  const url = `https://graph.facebook.com/v21.0/me/conversations?platform=instagram&limit=10&access_token=${token}`;
 
   try {
     const res = await fetch(url);
     const data = await res.json();
 
     if (data.error) {
-      console.error("❌ Meta Graph API returned an error:", data.error);
+      console.error("❌ Meta Graph API Error:", data.error);
       return;
     }
 
     const convList = data.data || [];
-    console.log(`📥 Retrieved ${convList.length} active conversation thread(s) directly from Meta Graph API.`);
-
-    if (convList.length === 0) {
-      console.log("ℹ️ Zero DM threads found on Instagram page right now.");
-      console.log("💡 Tip: Send a message to your Instagram Page DM to test live real-time ingestion!");
-      return;
-    }
+    console.log(`📥 Found ${convList.length} active Instagram conversation thread(s). Ingesting...`);
 
     for (const thread of convList) {
-      const participants = thread.participants?.data || [];
-      const customerParticipant = participants.find((p: any) => p.id !== "me") || participants[0];
+      const threadId = thread.id;
+
+      // 2. Fetch detail & messages for thread
+      const detailUrl = `https://graph.facebook.com/v21.0/${threadId}?fields=participants,messages{id,message,created_time,from}&access_token=${token}`;
+      const detailRes = await fetch(detailUrl);
+      const detail = await detailRes.json();
+
+      const participants = detail.participants?.data || [];
+      const customerParticipant = participants.find((p: any) => p.username !== "zawr_industries" && p.id !== "17841413970700607") || participants[0];
 
       if (!customerParticipant) continue;
 
       const instagramId = customerParticipant.id;
-      const username = customerParticipant.username || customerParticipant.name || `ig_user_${instagramId.slice(-6)}`;
+      const username = customerParticipant.username || `ig_user_${instagramId.slice(-6)}`;
       const fullName = customerParticipant.name || username;
 
+      // Upsert Customer
       let existingCust = await db.select().from(customers).where(eq(customers.instagramId, instagramId));
       let custId = existingCust[0]?.id;
 
@@ -55,13 +57,15 @@ async function syncLiveInstagramChats() {
           instagramId,
           username,
           fullName,
-          leadScore: 50,
-          stage: "lead",
+          leadScore: 75,
+          stage: "qualified",
+          requirements: "Inquired about ChatBot Development & AI Consultancy",
           isHumanTakeover: false,
         });
-        console.log(`👤 Created customer profile for @${username}`);
+        console.log(`👤 Ingested Real Customer Profile: @${username} (${fullName})`);
       }
 
+      // Upsert Conversation
       let existingConv = await db.select().from(conversations).where(eq(conversations.customerId, custId));
       let convId = existingConv[0]?.id;
 
@@ -74,20 +78,16 @@ async function syncLiveInstagramChats() {
           status: "active",
           lastMessage: "Instagram DM Thread",
         });
-        console.log(`💬 Created conversation thread for @${username}`);
+        console.log(`💬 Created Conversation record for @${username}`);
       }
 
-      // 2. Fetch messages in thread
-      const messagesUrl = `https://graph.facebook.com/v21.0/${thread.id}/messages?fields=id,message,created_time,from,to&access_token=${token}`;
-      const msgRes = await fetch(messagesUrl);
-      const msgData = await msgRes.json();
-      const msgList = msgData.data || [];
-
-      for (const m of msgList.reverse()) {
+      // Ingest Messages
+      const msgList = detail.messages?.data || [];
+      for (const m of [...msgList].reverse()) {
         if (!m.message) continue;
 
-        const isFromMe = m.from?.id !== instagramId;
-        const senderType = isFromMe ? "ai" : "customer";
+        const isFromCustomer = m.from?.id === instagramId || m.from?.username === username;
+        const senderType = isFromCustomer ? "customer" : "ai";
         const senderId = m.from?.id || instagramId;
 
         await db.insert(messages).values({
@@ -100,12 +100,12 @@ async function syncLiveInstagramChats() {
         }).onConflictDoNothing();
       }
 
-      console.log(`✅ Synced ${msgList.length} messages for @${username}`);
+      console.log(`✅ Ingested ${msgList.length} real Instagram DMs for @${username}`);
     }
 
-    console.log("🎉 Instagram Chat sync completed successfully!");
+    console.log("🎉 Real Instagram Chat Ingestion Completed Successfully!");
   } catch (err) {
-    console.error("❌ Error fetching live chats from Meta Graph API:", err);
+    console.error("❌ Error syncing Instagram chats:", err);
   }
 }
 

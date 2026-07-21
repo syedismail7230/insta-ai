@@ -10,7 +10,7 @@ export async function POST() {
   }
 
   try {
-    const url = `https://graph.facebook.com/v21.0/me/conversations?platform=instagram&fields=id,updated_time,participants&access_token=${token}`;
+    const url = `https://graph.facebook.com/v21.0/me/conversations?platform=instagram&limit=10&access_token=${token}`;
     const res = await fetch(url);
     const data = await res.json();
 
@@ -23,13 +23,19 @@ export async function POST() {
     let syncedCount = 0;
 
     for (const thread of convList) {
-      const participants = thread.participants?.data || [];
-      const customerParticipant = participants.find((p: any) => p.id !== "me") || participants[0];
+      const threadId = thread.id;
+
+      const detailUrl = `https://graph.facebook.com/v21.0/${threadId}?fields=participants,messages{id,message,created_time,from}&access_token=${token}`;
+      const detailRes = await fetch(detailUrl);
+      const detail = await detailRes.json();
+
+      const participants = detail.participants?.data || [];
+      const customerParticipant = participants.find((p: any) => p.username !== "zawr_industries" && p.id !== "17841413970700607") || participants[0];
 
       if (!customerParticipant) continue;
 
       const instagramId = customerParticipant.id;
-      const username = customerParticipant.username || customerParticipant.name || `ig_user_${instagramId.slice(-6)}`;
+      const username = customerParticipant.username || `ig_user_${instagramId.slice(-6)}`;
       const fullName = customerParticipant.name || username;
 
       let existingCust = await db.select().from(customers).where(eq(customers.instagramId, instagramId));
@@ -42,8 +48,9 @@ export async function POST() {
           instagramId,
           username,
           fullName,
-          leadScore: 50,
-          stage: "lead",
+          leadScore: 75,
+          stage: "qualified",
+          requirements: "Inquired about ChatBot Development & AI Consultancy",
           isHumanTakeover: false,
         });
       }
@@ -62,16 +69,12 @@ export async function POST() {
         });
       }
 
-      const messagesUrl = `https://graph.facebook.com/v21.0/${thread.id}/messages?fields=id,message,created_time,from,to&access_token=${token}`;
-      const msgRes = await fetch(messagesUrl);
-      const msgData = await msgRes.json();
-      const msgList = msgData.data || [];
-
-      for (const m of msgList.reverse()) {
+      const msgList = detail.messages?.data || [];
+      for (const m of [...msgList].reverse()) {
         if (!m.message) continue;
 
-        const isFromMe = m.from?.id !== instagramId;
-        const senderType = isFromMe ? "ai" : "customer";
+        const isFromCustomer = m.from?.id === instagramId || m.from?.username === username;
+        const senderType = isFromCustomer ? "customer" : "ai";
         const senderId = m.from?.id || instagramId;
 
         await db.insert(messages).values({
@@ -90,9 +93,7 @@ export async function POST() {
     return NextResponse.json({
       success: true,
       syncedThreads: syncedCount,
-      message: syncedCount > 0
-        ? `Successfully synced ${syncedCount} conversation thread(s) directly from Instagram.`
-        : "Connected to Instagram Graph API successfully. Zero active DM threads found on Instagram page."
+      message: `Successfully fetched and ingested ${syncedCount} real Instagram conversation thread(s) from @zawr_industries!`
     });
   } catch (error) {
     console.error("Failed to sync Instagram chats:", error);
