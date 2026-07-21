@@ -99,9 +99,9 @@ export async function GET(req: NextRequest) {
       if (isFromCustomer && latestMsg.message) {
         const msgId = `msg_${latestMsg.id}`;
 
+        // Stage 1: Log incoming message if not already present in the database
         const existingMsg = await db.select().from(messages).where(eq(messages.id, msgId));
         if (existingMsg.length === 0) {
-          // Log incoming message
           await db.insert(messages).values({
             id: msgId,
             conversationId: convId,
@@ -110,8 +110,17 @@ export async function GET(req: NextRequest) {
             content: latestMsg.message,
             createdAt: new Date(latestMsg.created_time),
           });
+        }
 
-          // Execute AI Engine
+        // Stage 2: Check if the latest message logged in the database is from the customer (unreplied)
+        const lastDbMsgs = await db.select().from(messages)
+          .where(eq(messages.conversationId, convId))
+          .orderBy(desc(messages.createdAt))
+          .limit(1);
+
+        const isLastMsgFromCustomer = lastDbMsgs[0]?.senderType === "customer";
+
+        if (isLastMsgFromCustomer) {   // Execute AI Engine
           console.log(`🤖 24/7 Auto-Replying to @${username}: "${latestMsg.message}"`);
           const aiResult = await processCustomerDM(latestMsg.message, {
             name: customer.fullName || customer.username || undefined,
