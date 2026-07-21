@@ -20,16 +20,20 @@ export default function RootLayout({
   if (publishableKey) {
     return (
       <ClerkProvider publishableKey={publishableKey}>
-        <html lang="en" className="dark">
-          <body className={`${inter.className} bg-[#09090b] text-white antialiased`}>{children}</body>
+        <html lang="en" className="dark" suppressHydrationWarning>
+          <body suppressHydrationWarning className={`${inter.className} bg-[#09090b] text-white antialiased`}>
+            {children}
+          </body>
         </html>
       </ClerkProvider>
     );
   }
 
   return (
-    <html lang="en" className="dark">
-      <body className={`${inter.className} bg-[#09090b] text-white antialiased`}>{children}</body>
+    <html lang="en" className="dark" suppressHydrationWarning>
+      <body suppressHydrationWarning className={`${inter.className} bg-[#09090b] text-white antialiased`}>
+        {children}
+      </body>
     </html>
   );
 }
