@@ -10,6 +10,7 @@ import {
   User,
   RefreshCw,
   DownloadCloud,
+  Zap,
 } from "lucide-react";
 import { useEffect, useState, useCallback, useRef } from "react";
 
@@ -20,6 +21,7 @@ export default function InboxPage() {
   const [inputMessage, setInputMessage] = useState<string>("");
   const [sending, setSending] = useState<boolean>(false);
   const [syncing, setSyncing] = useState<boolean>(false);
+  const [triggeringAi, setTriggeringAi] = useState<boolean>(false);
   const [syncStatus, setSyncStatus] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -96,6 +98,25 @@ export default function InboxPage() {
   }
 
   const selectedCustomer = customers.find((c) => c.id === selectedCustomerId) || customers[0];
+
+  async function handleTriggerAiReply() {
+    if (!selectedCustomer) return;
+    setTriggeringAi(true);
+    try {
+      const res = await fetch("/api/conversations/auto-reply", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ customerId: selectedCustomer.id }),
+      });
+      if (res.ok) {
+        loadConversation(selectedCustomer.id);
+      }
+    } catch (err) {
+      console.error("Failed to trigger AI reply:", err);
+    } finally {
+      setTriggeringAi(false);
+    }
+  }
 
   async function toggleHumanTakeover() {
     if (!selectedCustomer) return;
@@ -239,11 +260,17 @@ export default function InboxPage() {
                   </div>
                 </div>
 
-                {/* Human Takeover Toggle */}
+                {/* AI Controls */}
                 <div className="flex items-center space-x-3">
-                  <span className="text-xs text-zinc-400">
-                    {selectedCustomer.isHumanTakeover ? "Human Control Active" : "AI Auto-Reply Active"}
-                  </span>
+                  <button
+                    onClick={handleTriggerAiReply}
+                    disabled={triggeringAi}
+                    className="px-3 py-1.5 rounded-lg bg-emerald-500 text-black font-semibold text-xs hover:bg-emerald-400 transition flex items-center gap-1.5 shadow-sm shadow-emerald-500/20 disabled:opacity-50"
+                  >
+                    <Zap className="w-3.5 h-3.5 fill-black" />
+                    <span>{triggeringAi ? "AI Thinking..." : "AI Auto-Reply Now"}</span>
+                  </button>
+
                   <button
                     onClick={toggleHumanTakeover}
                     className={`px-3 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1.5 transition ${
@@ -258,7 +285,7 @@ export default function InboxPage() {
                 </div>
               </div>
 
-              {/* Real-time Message Stream (Scrolled container ONLY) */}
+              {/* Real-time Message Stream */}
               <div className="flex-1 overflow-y-auto p-6 space-y-4 min-h-0">
                 {messages.length === 0 ? (
                   <div className="text-center text-xs text-zinc-500 py-12">
@@ -301,7 +328,7 @@ export default function InboxPage() {
                 <div ref={messagesEndRef} />
               </div>
 
-              {/* Message Composer (Permanently Sticky at Bottom) */}
+              {/* Message Composer (Sticky at bottom) */}
               <div className="shrink-0 p-4 border-t border-[#27272a] bg-[#0c0c0e]">
                 <div className="flex items-center space-x-2">
                   <input
