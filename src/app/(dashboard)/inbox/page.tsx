@@ -2,89 +2,63 @@
 
 import { Header } from "@/components/layout/header";
 import {
-  MessageSquare,
   Send,
-  UserCheck,
-  Zap,
   Clock,
   DollarSign,
   FileText,
-  UserX,
   Bot,
   User,
-  CheckCircle2,
   RefreshCw,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 
 export default function InboxPage() {
   const [customers, setCustomers] = useState<any[]>([]);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
-  const [conversation, setConversation] = useState<any>(null);
   const [messages, setMessages] = useState<any[]>([]);
   const [inputMessage, setInputMessage] = useState<string>("");
   const [sending, setSending] = useState<boolean>(false);
-  const [loading, setLoading] = useState<boolean>(true);
 
-  useEffect(() => {
-    loadCustomers();
+  const loadConversation = useCallback(async (customerId: string) => {
+    setSelectedCustomerId(customerId);
+    try {
+      const res = await fetch(`/api/messages?customerId=${customerId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setMessages(data);
+      }
+    } catch (err) {
+      console.error("Failed to load real-time messages:", err);
+    }
   }, []);
 
-  async function loadCustomers() {
+  const loadCustomers = useCallback(async () => {
     try {
       const res = await fetch("/api/customers");
       if (res.ok) {
         const data = await res.json();
         setCustomers(data);
         if (data.length > 0 && !selectedCustomerId) {
-          setSelectedCustomerId(data[0].id);
           loadConversation(data[0].id);
         }
       }
     } catch (err) {
       console.error("Failed to load customers:", err);
-    } finally {
-      setLoading(false);
     }
-  }
+  }, [selectedCustomerId, loadConversation]);
 
-  async function loadConversation(customerId: string) {
-    setSelectedCustomerId(customerId);
-    // Fetch mock/real conversation messages for selected customer
-    // For sample customer cust_sample_101
-    setMessages([
-      {
-        id: "msg_1",
-        senderType: "customer",
-        content: "Hi Zawr team! Do you build custom Instagram AI Sales Bots with CRM integration?",
-        createdAt: new Date(Date.now() - 1000 * 60 * 15).toISOString(),
-      },
-      {
-        id: "msg_2",
-        senderType: "ai",
-        content: "Hello Alex! Yes absolutely. At Zawr Industries, we specialize in high-performance AI Sales Agents for Instagram DMs connected directly to PostgreSQL databases and custom dashboards.",
-        createdAt: new Date(Date.now() - 1000 * 60 * 14).toISOString(),
-      },
-      {
-        id: "msg_3",
-        senderType: "customer",
-        content: "Great! What is your estimated timeline and budget for a project like that?",
-        createdAt: new Date(Date.now() - 1000 * 60 * 10).toISOString(),
-      },
-      {
-        id: "msg_4",
-        senderType: "ai",
-        content: "Our MVP sprints start at $5,000 with a 1 to 3 week turnaround. Full custom enterprise AI platforms range between $15,000 and $35,000. Would you like to schedule a quick 1-on-1 technical discovery call?",
-        createdAt: new Date(Date.now() - 1000 * 60 * 9).toISOString(),
-      },
-      {
-        id: "msg_5",
-        senderType: "customer",
-        content: "Can we book a discovery call for this Thursday?",
-        createdAt: new Date(Date.now() - 1000 * 60 * 2).toISOString(),
-      },
-    ]);
-  }
+  useEffect(() => {
+    loadCustomers();
+  }, [loadCustomers]);
+
+  // Real-time polling for new incoming Instagram DMs every 3 seconds
+  useEffect(() => {
+    if (!selectedCustomerId) return;
+    const interval = setInterval(() => {
+      loadConversation(selectedCustomerId);
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [selectedCustomerId, loadConversation]);
 
   const selectedCustomer = customers.find((c) => c.id === selectedCustomerId) || customers[0];
 
@@ -117,16 +91,8 @@ export default function InboxPage() {
         body: JSON.stringify({ customerId: selectedCustomer.id, text: inputMessage }),
       });
       if (res.ok) {
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: `msg_human_${Date.now()}`,
-            senderType: "human",
-            content: inputMessage,
-            createdAt: new Date().toISOString(),
-          },
-        ]);
         setInputMessage("");
+        loadConversation(selectedCustomer.id);
       }
     } catch (err) {
       console.error("Failed to send message:", err);
@@ -143,7 +109,7 @@ export default function InboxPage() {
       />
 
       <div className="flex-1 flex overflow-hidden">
-        {/* Left Column: Conversations List */}
+        {/* Left Column: Real-time Conversations List */}
         <div className="w-80 bg-[#0c0c0e] border-r border-[#27272a] flex flex-col h-full">
           <div className="p-3.5 border-b border-[#27272a] flex items-center justify-between">
             <span className="text-xs font-semibold text-zinc-300">Active Conversations ({customers.length})</span>
@@ -193,11 +159,11 @@ export default function InboxPage() {
           </div>
         </div>
 
-        {/* Middle Column: Chat Window */}
+        {/* Middle Column: Real-time Live Chat Window */}
         <div className="flex-1 bg-[#09090b] flex flex-col h-full border-r border-[#27272a]">
           {selectedCustomer ? (
             <>
-              {/* Chat Top Header */}
+              {/* Chat Header */}
               <div className="h-14 px-6 border-b border-[#27272a] bg-[#0c0c0e] flex items-center justify-between shrink-0">
                 <div className="flex items-center space-x-3">
                   <img
@@ -214,7 +180,7 @@ export default function InboxPage() {
                   </div>
                 </div>
 
-                {/* Human Takeover Toggle Switch */}
+                {/* Human Takeover Toggle */}
                 <div className="flex items-center space-x-3">
                   <span className="text-xs text-zinc-400">
                     {selectedCustomer.isHumanTakeover ? "Human Control Active" : "AI Auto-Reply Active"}
@@ -233,41 +199,46 @@ export default function InboxPage() {
                 </div>
               </div>
 
-              {/* Message Feed */}
+              {/* Real-time Message Stream */}
               <div className="flex-1 p-6 overflow-y-auto space-y-4">
-                {messages.map((msg) => {
-                  const isCust = msg.senderType === "customer";
-                  const isAI = msg.senderType === "ai";
-                  const isHuman = msg.senderType === "human";
+                {messages.length === 0 ? (
+                  <div className="text-center text-xs text-zinc-500 py-12">
+                    No messages recorded yet for this customer. Incoming Instagram DMs will appear here in real-time.
+                  </div>
+                ) : (
+                  messages.map((msg) => {
+                    const isCust = msg.senderType === "customer";
+                    const isAI = msg.senderType === "ai";
 
-                  return (
-                    <div
-                      key={msg.id}
-                      className={`flex flex-col ${isCust ? "items-start" : "items-end"}`}
-                    >
-                      <div className="flex items-center space-x-1.5 mb-1">
-                        <span className="text-[10px] font-mono text-zinc-400">
-                          {isCust ? selectedCustomer.username : isAI ? "Zawr AI Agent" : "Zawr Admin (Human)"}
-                        </span>
-                        <span className="text-[9px] text-zinc-400">
-                          {new Date(msg.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                        </span>
-                      </div>
-
+                    return (
                       <div
-                        className={`max-w-md p-3.5 rounded-xl text-xs leading-relaxed ${
-                          isCust
-                            ? "bg-[#18181c] border border-zinc-800 text-zinc-200"
-                            : isAI
-                            ? "bg-zinc-800/90 border border-zinc-700 text-white shadow-sm"
-                            : "bg-emerald-950/80 border border-emerald-800/60 text-emerald-200"
-                        }`}
+                        key={msg.id}
+                        className={`flex flex-col ${isCust ? "items-start" : "items-end"}`}
                       >
-                        {msg.content}
+                        <div className="flex items-center space-x-1.5 mb-1">
+                          <span className="text-[10px] font-mono text-zinc-400">
+                            {isCust ? selectedCustomer.username : isAI ? "Zawr AI Agent" : "Zawr Admin (Human)"}
+                          </span>
+                          <span className="text-[9px] text-zinc-400">
+                            {new Date(msg.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                          </span>
+                        </div>
+
+                        <div
+                          className={`max-w-md p-3.5 rounded-xl text-xs leading-relaxed ${
+                            isCust
+                              ? "bg-[#18181c] border border-zinc-800 text-zinc-200"
+                              : isAI
+                              ? "bg-zinc-800/90 border border-zinc-700 text-white shadow-sm"
+                              : "bg-emerald-950/80 border border-emerald-800/60 text-emerald-200"
+                          }`}
+                        >
+                          {msg.content}
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })
+                )}
               </div>
 
               {/* Message Composer */}
@@ -281,7 +252,7 @@ export default function InboxPage() {
                     placeholder={
                       selectedCustomer.isHumanTakeover
                         ? "Type a manual Instagram DM response..."
-                        : "Type manual DM (sending will trigger human takeover)..."
+                        : "Type manual DM..."
                     }
                     className="flex-1 px-4 py-2.5 rounded-lg bg-[#141417] border border-[#27272a] text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-zinc-500"
                   />
@@ -303,7 +274,7 @@ export default function InboxPage() {
           )}
         </div>
 
-        {/* Right Column: Customer Lead Memory Drawer */}
+        {/* Right Column: Customer Real-time Memory Drawer */}
         {selectedCustomer && (
           <div className="w-72 bg-[#0c0c0e] flex flex-col h-full p-5 space-y-6 overflow-y-auto">
             <div>
@@ -336,7 +307,7 @@ export default function InboxPage() {
               </div>
             </div>
 
-            {/* Business Memory Details */}
+            {/* Real Business Memory Details */}
             <div className="space-y-4 text-xs">
               <div className="space-y-1">
                 <span className="text-zinc-400 flex items-center gap-1.5 text-[11px]">
