@@ -89,6 +89,28 @@ export default function PendingQuestionsPage() {
     }
   }
 
+  async function handleRegenerate(id: string) {
+    setProcessingId(id);
+    try {
+      const res = await fetch("/api/pending-questions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, action: "regenerate" }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.answer) {
+          setEditAnswers((prev) => ({ ...prev, [id]: data.answer }));
+        }
+      }
+    } catch (err) {
+      console.error("Failed to regenerate answer:", err);
+    } finally {
+      setProcessingId(null);
+    }
+  }
+
   const pendingQuestionsList = questions.filter((q) => q.status === "pending");
   const historyQuestionsList = questions.filter((q) => q.status !== "pending");
 
@@ -198,6 +220,15 @@ export default function PendingQuestionsPage() {
                     className="px-4 py-2 rounded-lg bg-zinc-800 text-zinc-300 text-xs font-semibold hover:bg-zinc-700 transition"
                   >
                     Reject
+                  </button>
+
+                  <button
+                    onClick={() => handleRegenerate(item.id)}
+                    disabled={processingId === item.id}
+                    className="px-4 py-2 rounded-lg bg-[#d97706]/10 text-[#f59e0b] border border-[#d97706]/20 text-xs font-semibold hover:bg-[#d97706]/20 hover:text-white transition flex items-center gap-1.5"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>{processingId === item.id ? "Regenerating..." : "Regenerate Response"}</span>
                   </button>
 
                   <button

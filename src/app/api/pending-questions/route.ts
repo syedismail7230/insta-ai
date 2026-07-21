@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { pendingQuestions, knowledgeBase, customers, conversations, messages } from "@/db/schema";
 import { eq, desc } from "drizzle-orm";
 import { sendInstagramDM } from "@/lib/channels/instagram";
+import { processCustomerDM } from "@/lib/ai/router";
 
 // GET: Fetch all pending questions
 export async function GET() {
@@ -107,6 +108,25 @@ export async function POST(req: NextRequest) {
         .where(eq(pendingQuestions.id, id));
 
       return NextResponse.json({ success: true, message: "Question rejected." });
+    } else if (action === "regenerate") {
+      // Fetch customer details to build context
+      const custRows = await db.select().from(customers).where(eq(customers.id, pq.customerId));
+      const customer = custRows[0];
+
+      // Request fresh AI response
+      const aiResult = await processCustomerDM(pq.question, customer ? {
+        name: customer.fullName || customer.username || undefined,
+        budget: customer.budget || undefined,
+        timeline: customer.timeline || undefined,
+        stage: customer.stage,
+      } : undefined);
+
+      // Save the newly generated suggested answer in database
+      await db.update(pendingQuestions)
+        .set({ suggestedAnswer: aiResult.answer })
+        .where(eq(pendingQuestions.id, id));
+
+      return NextResponse.json({ success: true, answer: aiResult.answer });
     }
 
     return NextResponse.json({ error: "Invalid action" }, { status: 400 });
