@@ -116,7 +116,7 @@ export default function SettingsPage() {
   }
 
   function copyWebhookUrl() {
-    navigator.clipboard.writeText("https://ai-social-media-nine.vercel.app/api/webhooks/instagram");
+    navigator.clipboard.writeText("https://insta-ai-lime.vercel.app/api/webhooks/instagram");
     setCopiedWebhook(true);
     setTimeout(() => setCopiedWebhook(false), 2000);
   }
@@ -394,7 +394,7 @@ export default function SettingsPage() {
                   <input
                     type="text"
                     readOnly
-                    value="https://ai-social-media-nine.vercel.app/api/webhooks/instagram"
+                    value="https://insta-ai-lime.vercel.app/api/webhooks/instagram"
                     className="flex-1 px-3 py-2.5 rounded-lg bg-[#18181c] border border-zinc-800 font-mono text-zinc-300 focus:outline-none"
                   />
                   <button
