@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import { ClerkProvider } from "@clerk/nextjs";
+import { Sidebar } from "@/components/layout/sidebar";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -15,24 +15,13 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const publishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
-
-  if (publishableKey) {
-    return (
-      <ClerkProvider publishableKey={publishableKey}>
-        <html lang="en" className="dark" suppressHydrationWarning>
-          <body suppressHydrationWarning className={`${inter.className} bg-[#09090b] text-white antialiased`}>
-            {children}
-          </body>
-        </html>
-      </ClerkProvider>
-    );
-  }
-
   return (
     <html lang="en" className="dark" suppressHydrationWarning>
       <body suppressHydrationWarning className={`${inter.className} bg-[#09090b] text-white antialiased`}>
-        {children}
+        <div className="flex min-h-screen bg-[#09090b]">
+          <Sidebar />
+          <main className="flex-1 overflow-x-hidden flex flex-col">{children}</main>
+        </div>
       </body>
     </html>
   );
