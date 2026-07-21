@@ -11,7 +11,7 @@ import {
   RefreshCw,
   DownloadCloud,
 } from "lucide-react";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 
 export default function InboxPage() {
   const [customers, setCustomers] = useState<any[]>([]);
@@ -21,6 +21,12 @@ export default function InboxPage() {
   const [sending, setSending] = useState<boolean>(false);
   const [syncing, setSyncing] = useState<boolean>(false);
   const [syncStatus, setSyncStatus] = useState<string | null>(null);
+
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
 
   const loadConversation = useCallback(async (customerId: string) => {
     setSelectedCustomerId(customerId);
@@ -53,6 +59,11 @@ export default function InboxPage() {
   useEffect(() => {
     loadCustomers();
   }, [loadCustomers]);
+
+  // Auto-scroll to bottom when messages update
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
 
   // Real-time polling for new incoming Instagram DMs every 3 seconds
   useEffect(() => {
@@ -126,23 +137,27 @@ export default function InboxPage() {
   }
 
   return (
-    <div className="flex-1 flex flex-col h-screen overflow-hidden">
-      <Header
-        title="Instagram Live Inbox"
-        description="Monitor real-time DM conversations, toggle human takeover, and inspect lead memory."
-      />
+    <div className="flex-1 flex flex-col h-screen max-h-screen overflow-hidden bg-[#09090b]">
+      {/* Header */}
+      <div className="shrink-0">
+        <Header
+          title="Instagram Live Inbox"
+          description="Monitor real-time DM conversations, toggle human takeover, and inspect lead memory."
+        />
+      </div>
 
       {/* Sync Status Banner */}
       {syncStatus && (
-        <div className="bg-zinc-900 border-b border-zinc-800 px-6 py-2 text-xs text-emerald-400 font-mono flex items-center justify-between">
+        <div className="shrink-0 bg-zinc-900 border-b border-zinc-800 px-6 py-2 text-xs text-emerald-400 font-mono flex items-center justify-between">
           <span>{syncStatus}</span>
         </div>
       )}
 
-      <div className="flex-1 flex overflow-hidden">
+      {/* Main 3-Column Layout Container */}
+      <div className="flex-1 flex overflow-hidden min-h-0">
         {/* Left Column: Real-time Conversations List */}
-        <div className="w-80 bg-[#0c0c0e] border-r border-[#27272a] flex flex-col h-full">
-          <div className="p-3.5 border-b border-[#27272a] flex items-center justify-between">
+        <div className="w-80 bg-[#0c0c0e] border-r border-[#27272a] flex flex-col h-full overflow-hidden shrink-0">
+          <div className="p-3.5 border-b border-[#27272a] flex items-center justify-between shrink-0">
             <span className="text-xs font-semibold text-zinc-300">Active Conversations ({customers.length})</span>
             <div className="flex items-center space-x-1">
               <button
@@ -160,7 +175,7 @@ export default function InboxPage() {
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto divide-y divide-zinc-800/40">
+          <div className="flex-1 overflow-y-auto divide-y divide-zinc-800/40 min-h-0">
             {customers.length === 0 ? (
               <div className="p-6 text-center text-xs text-zinc-500 leading-relaxed">
                 No active conversations found. Click <span className="text-zinc-300 font-semibold">"Sync IG"</span> above to pull live chats from Instagram, or send a DM to your Instagram page!
@@ -206,7 +221,7 @@ export default function InboxPage() {
         </div>
 
         {/* Middle Column: Real-time Live Chat Window */}
-        <div className="flex-1 bg-[#09090b] flex flex-col h-full border-r border-[#27272a]">
+        <div className="flex-1 bg-[#09090b] flex flex-col h-full min-h-0 overflow-hidden border-r border-[#27272a] relative">
           {selectedCustomer ? (
             <>
               {/* Chat Header */}
@@ -243,8 +258,8 @@ export default function InboxPage() {
                 </div>
               </div>
 
-              {/* Real-time Message Stream */}
-              <div className="flex-1 p-6 overflow-y-auto space-y-4">
+              {/* Real-time Message Stream (Scrolled container ONLY) */}
+              <div className="flex-1 overflow-y-auto p-6 space-y-4 min-h-0">
                 {messages.length === 0 ? (
                   <div className="text-center text-xs text-zinc-500 py-12">
                     No messages recorded yet for this customer. Incoming Instagram DMs will appear here in real-time.
@@ -283,10 +298,11 @@ export default function InboxPage() {
                     );
                   })
                 )}
+                <div ref={messagesEndRef} />
               </div>
 
-              {/* Message Composer */}
-              <div className="p-4 border-t border-[#27272a] bg-[#0c0c0e]">
+              {/* Message Composer (Permanently Sticky at Bottom) */}
+              <div className="shrink-0 p-4 border-t border-[#27272a] bg-[#0c0c0e]">
                 <div className="flex items-center space-x-2">
                   <input
                     type="text"
@@ -296,7 +312,7 @@ export default function InboxPage() {
                     placeholder={
                       selectedCustomer.isHumanTakeover
                         ? "Type a manual Instagram DM response..."
-                        : "Type manual DM..."
+                        : "Type manual DM response..."
                     }
                     className="flex-1 px-4 py-2.5 rounded-lg bg-[#141417] border border-[#27272a] text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-zinc-500"
                   />
@@ -320,7 +336,7 @@ export default function InboxPage() {
 
         {/* Right Column: Customer Real-time Memory Drawer */}
         {selectedCustomer && (
-          <div className="w-72 bg-[#0c0c0e] flex flex-col h-full p-5 space-y-6 overflow-y-auto">
+          <div className="w-72 bg-[#0c0c0e] flex flex-col h-full overflow-y-auto border-l border-[#27272a] p-5 space-y-6 shrink-0">
             <div>
               <h3 className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Customer Memory</h3>
               <div className="mt-3 flex items-center space-x-3">

@@ -36,8 +36,8 @@ export async function sendInstagramDM(recipientId: string, text: string): Promis
     return false;
   }
 
-  const url = `https://graph.facebook.com/v21.0/me/messages?access_token=${pageToken}`;
-
+  // Attempt 1: Standard Response via /me/messages
+  const meUrl = `https://graph.facebook.com/v21.0/me/messages?access_token=${pageToken}`;
   const payload = {
     recipient: { id: recipientId },
     message: { text },
@@ -45,44 +45,59 @@ export async function sendInstagramDM(recipientId: string, text: string): Promis
   };
 
   try {
-    const res = await fetch(url, {
+    const res = await fetch(meUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
     });
 
-    if (!res.ok) {
-      const errJson = await res.json();
-      console.error("❌ Meta Instagram DM send failed:", JSON.stringify(errJson, null, 2));
-
-      // Retry with HUMAN_AGENT tag if outside 24h standard window
-      if (errJson?.error?.code === 10 || errJson?.error?.error_subcode === 2534022) {
-        console.log("🔄 Retrying Instagram DM send with HUMAN_AGENT tag...");
-        const retryPayload = {
-          recipient: { id: recipientId },
-          message: { text },
-          messaging_type: "MESSAGE_TAG",
-          tag: "HUMAN_AGENT"
-        };
-        const retryRes = await fetch(url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(retryPayload)
-        });
-        if (retryRes.ok) {
-          const retryData = await retryRes.json();
-          console.log("✅ Instagram DM sent with HUMAN_AGENT tag:", retryData);
-          return true;
-        }
-      }
-      return false;
+    if (res.ok) {
+      const data = await res.json();
+      console.log("✅ Instagram DM sent successfully via /me/messages:", data);
+      return true;
     }
 
-    const data = await res.json();
-    console.log("✅ Instagram DM sent successfully:", data);
-    return true;
+    const errJson = await res.json();
+    console.warn("⚠️ Standard DM send failed, retrying with HUMAN_AGENT tag:", JSON.stringify(errJson));
+
+    // Attempt 2: Retry with HUMAN_AGENT tag
+    const retryPayload = {
+      recipient: { id: recipientId },
+      message: { text },
+      messaging_type: "MESSAGE_TAG",
+      tag: "HUMAN_AGENT"
+    };
+    const retryRes = await fetch(meUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(retryPayload)
+    });
+
+    if (retryRes.ok) {
+      const retryData = await retryRes.json();
+      console.log("✅ Instagram DM sent with HUMAN_AGENT tag:", retryData);
+      return true;
+    }
+
+    // Attempt 3: Retry via Instagram Account Node directly (17841413970700607)
+    const igNodeUrl = `https://graph.facebook.com/v21.0/17841413970700607/messages?access_token=${pageToken}`;
+    const igRes = await fetch(igNodeUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+
+    if (igRes.ok) {
+      const igData = await igRes.json();
+      console.log("✅ Instagram DM sent via IG Business Node:", igData);
+      return true;
+    }
+
+    const igErr = await igRes.json();
+    console.error("❌ All Instagram DM send attempts failed:", JSON.stringify(igErr));
+    return false;
   } catch (error) {
-    console.error("❌ Error sending Instagram DM:", error);
+    console.error("❌ Exception sending Instagram DM:", error);
     return false;
   }
 }
@@ -93,27 +108,57 @@ export function parseInstagramWebhookPayload(body: Record<string, unknown>): Ins
   if (body.object === "instagram" || body.object === "page") {
     const entries = (body.entry as Array<Record<string, unknown>>) || [];
     entries.forEach((entry) => {
-      const messagingList = (entry.messaging || entry.changes) as Array<Record<string, unknown>>;
-      messagingList?.forEach((messagingItem) => {
-        const msgObj = (messagingItem.message || (messagingItem.value as Record<string, unknown>)?.message) as Record<string, unknown>;
-        // Filter out echo messages (our own Page replies)
-        if (msgObj && typeof msgObj.text === "string" && !msgObj.is_echo) {
-          const senderObj = (messagingItem.sender || (messagingItem.value as Record<string, unknown>)?.from) as Record<string, unknown>;
-          const recipientObj = messagingItem.recipient as Record<string, unknown>;
-          const senderId = (senderObj?.id as string) || "unknown_sender";
+      // 1. Handle messaging array
+      const messagingList = entry.messaging as Array<Record<string, unknown>>;
+      if (Array.isArray(messagingList)) {
+        messagingList.forEach((messagingItem) => {
+          const msgObj = messagingItem.message as Record<string, unknown>;
+          if (msgObj && typeof msgObj.text === "string" && !msgObj.is_echo) {
+            const senderObj = messagingItem.sender as Record<string, unknown>;
+            const recipientObj = messagingItem.recipient as Record<string, unknown>;
+            const senderId = (senderObj?.id as string) || "unknown_sender";
 
-          // Ignore messages sent by our own Instagram Business Page
-          if (senderId !== "17841413970700607" && senderId !== "115679509983218") {
-            events.push({
-              senderId,
-              recipientId: (recipientObj?.id as string) || (entry.id as string) || "unknown_recipient",
-              timestamp: (messagingItem.timestamp as number) || Date.now(),
-              messageId: (msgObj.mid as string) || `mid_${Date.now()}`,
-              text: msgObj.text
-            });
+            if (senderId !== "17841413970700607" && senderId !== "115679509983218") {
+              events.push({
+                senderId,
+                recipientId: (recipientObj?.id as string) || (entry.id as string) || "unknown_recipient",
+                timestamp: (messagingItem.timestamp as number) || Date.now(),
+                messageId: (msgObj.mid as string) || `mid_${Date.now()}`,
+                text: msgObj.text
+              });
+            }
           }
-        }
-      });
+        });
+      }
+
+      // 2. Handle changes array (Instagram Graph API webhook format)
+      const changesList = entry.changes as Array<Record<string, unknown>>;
+      if (Array.isArray(changesList)) {
+        changesList.forEach((changeItem) => {
+          const valueObj = changeItem.value as Record<string, unknown>;
+          if (valueObj) {
+            // Check direct message in value
+            const msgObj = (valueObj.message || valueObj.messages?.[0]) as Record<string, unknown>;
+            const text = (msgObj?.text || valueObj.text) as string;
+
+            if (text && !msgObj?.is_echo) {
+              const senderObj = (valueObj.from || valueObj.sender) as Record<string, unknown>;
+              const recipientObj = (valueObj.to || valueObj.recipient) as Record<string, unknown>;
+              const senderId = (senderObj?.id as string) || "unknown_sender";
+
+              if (senderId !== "17841413970700607" && senderId !== "115679509983218") {
+                events.push({
+                  senderId,
+                  recipientId: (recipientObj?.id as string) || (entry.id as string) || "unknown_recipient",
+                  timestamp: (valueObj.timestamp as number) || Date.now(),
+                  messageId: (msgObj?.id as string) || `mid_${Date.now()}`,
+                  text
+                });
+              }
+            }
+          }
+        });
+      }
     });
   }
 
