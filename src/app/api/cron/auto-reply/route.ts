@@ -13,10 +13,14 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "INSTAGRAM_PAGE_ACCESS_TOKEN missing" }, { status: 400 });
     }
 
-    console.log("⏰ 24/7 Autonomous Cron Job: Syncing & Auto-Replying to pending Instagram DMs...");
+    // Detect whether token is Instagram Graph API token (starts with IGAG) or Facebook Page Access Token
+    const isIgToken = token.startsWith("IGAG");
+    const baseDomain = isIgToken ? "graph.instagram.com" : "graph.facebook.com";
 
-    // 1. Fetch recent threads from Meta Graph API
-    const url = `https://graph.facebook.com/v21.0/me/conversations?platform=instagram&limit=5&access_token=${token}`;
+    console.log(`⏰ 24/7 Autonomous Cron Job: Fetching via ${baseDomain}...`);
+
+    // 1. Fetch recent threads
+    const url = `https://${baseDomain}/v21.0/me/conversations?platform=instagram&limit=5&access_token=${token}`;
     const res = await fetch(url);
     const data = await res.json();
 
@@ -31,12 +35,12 @@ export async function GET(req: NextRequest) {
 
     for (const thread of convList) {
       const threadId = thread.id;
-      const detailUrl = `https://graph.facebook.com/v21.0/${threadId}?fields=participants,messages{id,message,created_time,from}&access_token=${token}`;
+      const detailUrl = `https://${baseDomain}/v21.0/${threadId}?fields=participants,messages{id,message,created_time,from}&access_token=${token}`;
       const detailRes = await fetch(detailUrl);
       const detail = await detailRes.json();
 
       const participants = detail.participants?.data || [];
-      const customerParticipant = participants.find((p: any) => p.username !== "zawr_industries" && p.id !== "17841413970700607") || participants[0];
+      const customerParticipant = participants.find((p: any) => p.username !== "zawr_industries" && p.id !== "17841413970700607" && p.id !== "27796712339961368") || participants[0];
 
       if (!customerParticipant) continue;
 
@@ -87,14 +91,12 @@ export async function GET(req: NextRequest) {
       const msgList = detail.messages?.data || [];
       if (msgList.length === 0) continue;
 
-      const latestMsg = msgList[0]; // Most recent message
+      const latestMsg = msgList[0];
       const isFromCustomer = latestMsg.from?.id === instagramId || latestMsg.from?.username === username;
 
-      // If the latest message in thread is from the customer and has NOT been replied to yet
       if (isFromCustomer && latestMsg.message) {
         const msgId = `msg_${latestMsg.id}`;
 
-        // Check if we already logged & replied to this message ID
         const existingMsg = await db.select().from(messages).where(eq(messages.id, msgId));
         if (existingMsg.length === 0) {
           // Log incoming message
@@ -107,7 +109,7 @@ export async function GET(req: NextRequest) {
             createdAt: new Date(latestMsg.created_time),
           });
 
-          // Execute 24/7 Autonomous AI Engine
+          // Execute AI Engine
           console.log(`🤖 24/7 Auto-Replying to @${username}: "${latestMsg.message}"`);
           const aiResult = await processCustomerDM(latestMsg.message, {
             name: customer.fullName || customer.username || undefined,
@@ -131,7 +133,6 @@ export async function GET(req: NextRequest) {
 
             autoRepliedCount++;
           } else {
-            // Unclear / Off-KB query: Escalate to Pending Questions
             console.log(`❓ Query unclear for @${username}. Escalating to Pending Questions Queue.`);
 
             await db.insert(pendingQuestions).values({
