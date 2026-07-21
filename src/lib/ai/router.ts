@@ -26,7 +26,29 @@ export async function processCustomerDM(
   };
 
   // 2. Fetch Active Knowledge Base items
-  const kbRows = await db.select().from(knowledgeBase).where(eq(knowledgeBase.isActive, true));
+  const allKbRows = await db.select().from(knowledgeBase).where(eq(knowledgeBase.isActive, true));
+
+  // Dynamic keyword relevance matching to reduce token bloat on LLM requests
+  let kbRows = allKbRows;
+  if (allKbRows.length > 5) {
+    const queryTokens = userQuery.toLowerCase().split(/\W+/).filter(t => t.length > 2);
+    const scoredKbRows = allKbRows.map(item => {
+      let score = 0;
+      const content = `${item.question} ${item.answer} ${item.tags || ""}`.toLowerCase();
+      for (const token of queryTokens) {
+        if (content.includes(token)) {
+          score += 2;
+        }
+      }
+      return { item, score };
+    });
+
+    // Take top 5 most relevant entries, fallback to first 5 if no score matches
+    kbRows = scoredKbRows
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 5)
+      .map(x => x.item);
+  }
 
   // 3. Fetch Active Links
   const linkRows = await db.select().from(links);
