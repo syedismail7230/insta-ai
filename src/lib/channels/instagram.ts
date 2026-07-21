@@ -36,8 +36,14 @@ export async function sendInstagramDM(recipientId: string, text: string): Promis
     return false;
   }
 
+  // Detect whether token is Instagram Graph API token (starts with IGAG) or Facebook Page Access Token
+  const isIgToken = pageToken.startsWith("IGAG");
+  const baseDomain = isIgToken ? "graph.instagram.com" : "graph.facebook.com";
+
+  console.log(`🤖 Outbound DM delivery using token type: ${isIgToken ? "Instagram Graph API Token (IGAG)" : "Facebook Page Token (EAAX)"}`);
+
   // Attempt 1: Standard Response via /me/messages (Within 24h window)
-  const meUrl = `https://graph.facebook.com/v21.0/me/messages?access_token=${pageToken}`;
+  const meUrl = `https://${baseDomain}/v21.0/me/messages?access_token=${pageToken}`;
   const payload = {
     recipient: { id: recipientId },
     message: { text },
@@ -53,7 +59,7 @@ export async function sendInstagramDM(recipientId: string, text: string): Promis
 
     if (res.ok) {
       const data = await res.json();
-      console.log("✅ Instagram DM sent successfully via /me/messages:", data);
+      console.log(`✅ Instagram DM sent successfully via /me/messages (${baseDomain}):`, data);
       return true;
     }
 
@@ -98,22 +104,23 @@ export async function sendInstagramDM(recipientId: string, text: string): Promis
       return true;
     }
 
-    // Attempt 4: Direct Instagram Node Retry (17841413970700607)
-    const igNodeUrl = `https://graph.facebook.com/v21.0/17841413970700607/messages?access_token=${pageToken}`;
-    const igRes = await fetch(igNodeUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    });
+    // Attempt 4: Direct IG Business node send (for EAAX tokens)
+    if (!isIgToken) {
+      const igNodeUrl = `https://graph.facebook.com/v21.0/17841413970700607/messages?access_token=${pageToken}`;
+      const igRes = await fetch(igNodeUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
 
-    if (igRes.ok) {
-      const igData = await igRes.json();
-      console.log("✅ Instagram DM sent via IG Business Node:", igData);
-      return true;
+      if (igRes.ok) {
+        const igData = await igRes.json();
+        console.log("✅ Instagram DM sent via IG Business Node:", igData);
+        return true;
+      }
     }
 
-    const igErr = await igRes.json();
-    console.error("❌ All Instagram DM send attempts failed (Thread older than allowed Meta window):", JSON.stringify(igErr));
+    console.error(`❌ All Instagram DM send attempts failed for recipient ${recipientId}. Thread outside Meta 24h window.`);
     return false;
   } catch (error) {
     console.error("❌ Exception sending Instagram DM:", error);
@@ -137,7 +144,7 @@ export function parseInstagramWebhookPayload(body: Record<string, unknown>): Ins
             const recipientObj = messagingItem.recipient as Record<string, unknown>;
             const senderId = (senderObj?.id as string) || "unknown_sender";
 
-            if (senderId !== "17841413970700607" && senderId !== "115679509983218") {
+            if (senderId !== "17841413970700607" && senderId !== "115679509983218" && senderId !== "27796712339961368") {
               events.push({
                 senderId,
                 recipientId: (recipientObj?.id as string) || (entry.id as string) || "unknown_recipient",
@@ -164,7 +171,7 @@ export function parseInstagramWebhookPayload(body: Record<string, unknown>): Ins
               const recipientObj = (valueObj.to || valueObj.recipient) as Record<string, unknown>;
               const senderId = (senderObj?.id as string) || "unknown_sender";
 
-              if (senderId !== "17841413970700607" && senderId !== "115679509983218") {
+              if (senderId !== "17841413970700607" && senderId !== "115679509983218" && senderId !== "27796712339961368") {
                 events.push({
                   senderId,
                   recipientId: (recipientObj?.id as string) || (entry.id as string) || "unknown_recipient",
