@@ -8,7 +8,7 @@ export async function generateOpenAIResponse(
   kbItems: KBItem[],
   linksList: Array<{ title: string; url: string; category: string }>,
   modelName: string = "gpt-4o-mini",
-  customerContext?: any
+  customerContext?: { name?: string; budget?: string; timeline?: string; stage?: string }
 ) {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {

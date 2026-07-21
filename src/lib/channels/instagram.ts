@@ -10,7 +10,7 @@ export interface InstagramMessageEvent {
 
 export function verifyMetaSignature(rawBody: string, signatureHeader: string | null): boolean {
   const secret = process.env.META_APP_SECRET;
-  if (!secret || !signatureHeader) return true; // allow testing if not strictly enforced in dev
+  if (!secret || !signatureHeader) return true;
 
   try {
     const parts = signatureHeader.split("=");
@@ -65,21 +65,25 @@ export async function sendInstagramDM(recipientId: string, text: string): Promis
   }
 }
 
-export function parseInstagramWebhookPayload(body: any): InstagramMessageEvent[] {
+export function parseInstagramWebhookPayload(body: Record<string, unknown>): InstagramMessageEvent[] {
   const events: InstagramMessageEvent[] = [];
 
   if (body.object === "instagram" || body.object === "page") {
-    body.entry?.forEach((entry: any) => {
-      const messagingList = entry.messaging || entry.changes;
-      messagingList?.forEach((messagingItem: any) => {
-        const message = messagingItem.message || messagingItem.value?.message;
-        if (message && message.text) {
+    const entries = (body.entry as Array<Record<string, unknown>>) || [];
+    entries.forEach((entry) => {
+      const messagingList = (entry.messaging || entry.changes) as Array<Record<string, unknown>>;
+      messagingList?.forEach((messagingItem) => {
+        const msgObj = (messagingItem.message || (messagingItem.value as Record<string, unknown>)?.message) as Record<string, unknown>;
+        if (msgObj && typeof msgObj.text === "string") {
+          const senderObj = (messagingItem.sender || (messagingItem.value as Record<string, unknown>)?.from) as Record<string, unknown>;
+          const recipientObj = messagingItem.recipient as Record<string, unknown>;
+
           events.push({
-            senderId: messagingItem.sender?.id || messagingItem.value?.from?.id,
-            recipientId: messagingItem.recipient?.id || entry.id,
-            timestamp: messagingItem.timestamp || Date.now(),
-            messageId: message.mid || `mid_${Date.now()}`,
-            text: message.text
+            senderId: (senderObj?.id as string) || "unknown_sender",
+            recipientId: (recipientObj?.id as string) || (entry.id as string) || "unknown_recipient",
+            timestamp: (messagingItem.timestamp as number) || Date.now(),
+            messageId: (msgObj.mid as string) || `mid_${Date.now()}`,
+            text: msgObj.text
           });
         }
       });

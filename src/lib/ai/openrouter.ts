@@ -8,7 +8,7 @@ export async function generateOpenRouterResponse(
   kbItems: KBItem[],
   linksList: Array<{ title: string; url: string; category: string }>,
   modelName: string = "anthropic/claude-3.5-haiku",
-  customerContext?: any
+  customerContext?: { name?: string; budget?: string; timeline?: string; stage?: string }
 ) {
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) {

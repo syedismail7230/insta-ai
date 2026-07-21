@@ -8,7 +8,7 @@ export async function generateGroqResponse(
   kbItems: KBItem[],
   linksList: Array<{ title: string; url: string; category: string }>,
   modelName: string = "llama-3.3-70b-versatile",
-  customerContext?: any
+  customerContext?: { name?: string; budget?: string; timeline?: string; stage?: string }
 ) {
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {

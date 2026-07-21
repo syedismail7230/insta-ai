@@ -11,9 +11,6 @@ import {
   BarChart3,
   Settings,
   Bot,
-  CheckCircle2,
-  Sparkles,
-  Layers,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -31,7 +28,7 @@ export function Sidebar() {
         ]);
         if (pqRes.ok) {
           const pqs = await pqRes.json();
-          const pending = pqs.filter((q: any) => q.status === "pending").length;
+          const pending = pqs.filter((q: { status: string }) => q.status === "pending").length;
           setPendingCount(pending);
         }
         if (setRes.ok) {

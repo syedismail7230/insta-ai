@@ -7,7 +7,7 @@ export async function generateGeminiResponse(
   systemPrompt: string,
   kbItems: KBItem[],
   linksList: Array<{ title: string; url: string; category: string }>,
-  customerContext?: any
+  customerContext?: { name?: string; budget?: string; timeline?: string; stage?: string }
 ) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
@@ -29,7 +29,7 @@ export async function generateGeminiResponse(
       }
     ],
     generationConfig: {
-      temperature: 0.2, // Low temperature for high accuracy & zero hallucination
+      temperature: 0.2,
       responseMimeType: "application/json"
     }
   };
@@ -55,7 +55,7 @@ export async function generateGeminiResponse(
 
   try {
     return JSON.parse(text);
-  } catch (err) {
+  } catch {
     console.error("Failed to parse Gemini JSON output:", text);
     return {
       answer: text,
