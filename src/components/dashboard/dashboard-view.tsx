@@ -76,9 +76,8 @@ export function DashboardView() {
             <div className="mt-3 text-2xl font-bold text-white tracking-tight">
               {loading ? "..." : stats.totalCustomers}
             </div>
-            <div className="mt-2 flex items-center text-[11px] text-emerald-400 gap-1 font-medium">
-              <TrendingUp className="w-3 h-3" />
-              <span>+18% this week</span>
+            <div className="mt-2 text-[11px] text-zinc-400 font-medium">
+              Real-time database count
             </div>
           </div>
 
@@ -164,40 +163,44 @@ export function DashboardView() {
             </div>
 
             <div className="space-y-2.5">
-              {recentCustomers.map((cust) => (
-                <div
-                  key={cust.id}
-                  className="p-3.5 rounded-lg bg-[#18181c] border border-zinc-800/80 flex items-center justify-between hover:border-zinc-700 transition"
-                >
-                  <div className="flex items-center space-x-3">
-                    <img
-                      src={cust.profilePic || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100"}
-                      alt={cust.username}
-                      className="w-9 h-9 rounded-full border border-zinc-700 object-cover"
-                    />
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-semibold text-white">{cust.fullName || cust.username}</span>
-                        <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400">
-                          @{cust.username}
-                        </span>
+              {recentCustomers.length === 0 ? (
+                <div className="p-8 text-center text-xs text-zinc-500">
+                  No Instagram DMs received yet. Live incoming customer leads will populate here in real-time.
+                </div>
+              ) : (
+                recentCustomers.map((cust) => (
+                  <div
+                    key={cust.id}
+                    className="p-3.5 rounded-lg bg-[#18181c] border border-zinc-800/80 flex items-center justify-between hover:border-zinc-700 transition"
+                  >
+                    <div className="flex items-center space-x-3">
+                      <div className="w-9 h-9 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center font-bold text-xs text-white">
+                        {cust.username ? cust.username.charAt(0).toUpperCase() : "U"}
                       </div>
-                      <p className="text-[11px] text-zinc-400 truncate max-w-sm mt-0.5">
-                        {cust.requirements || "Inquired about custom software engineering"}
-                      </p>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-semibold text-white">{cust.fullName || cust.username}</span>
+                          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400">
+                            @{cust.username}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-zinc-400 truncate max-w-sm mt-0.5">
+                          {cust.requirements || "Inquired via Instagram DM"}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center space-x-3">
+                      <span className="px-2 py-0.5 text-[10px] font-medium rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                        Score {cust.leadScore}/100
+                      </span>
+                      <span className="text-xs text-zinc-400 font-mono">
+                        {cust.budget || "Pending"}
+                      </span>
                     </div>
                   </div>
-
-                  <div className="flex items-center space-x-3">
-                    <span className="px-2 py-0.5 text-[10px] font-medium rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                      Score {cust.leadScore}/100
-                    </span>
-                    <span className="text-xs text-zinc-400 font-mono">
-                      {cust.budget || "$15k+"}
-                    </span>
-                  </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </div>
 
