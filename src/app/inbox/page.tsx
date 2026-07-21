@@ -9,6 +9,7 @@ import {
   Bot,
   User,
   RefreshCw,
+  DownloadCloud,
 } from "lucide-react";
 import { useEffect, useState, useCallback } from "react";
 
@@ -18,6 +19,8 @@ export default function InboxPage() {
   const [messages, setMessages] = useState<any[]>([]);
   const [inputMessage, setInputMessage] = useState<string>("");
   const [sending, setSending] = useState<boolean>(false);
+  const [syncing, setSyncing] = useState<boolean>(false);
+  const [syncStatus, setSyncStatus] = useState<string | null>(null);
 
   const loadConversation = useCallback(async (customerId: string) => {
     setSelectedCustomerId(customerId);
@@ -59,6 +62,27 @@ export default function InboxPage() {
     }, 3000);
     return () => clearInterval(interval);
   }, [selectedCustomerId, loadConversation]);
+
+  async function handleSyncInstagramChats() {
+    setSyncing(true);
+    setSyncStatus("Connecting to Meta Graph API...");
+    try {
+      const res = await fetch("/api/conversations/sync", { method: "POST" });
+      const data = await res.json();
+      if (res.ok) {
+        setSyncStatus(data.message);
+        loadCustomers();
+      } else {
+        setSyncStatus(`Sync error: ${data.error}`);
+      }
+    } catch (err) {
+      console.error("Sync failed:", err);
+      setSyncStatus("Failed to sync Instagram chats.");
+    } finally {
+      setSyncing(false);
+      setTimeout(() => setSyncStatus(null), 5000);
+    }
+  }
 
   const selectedCustomer = customers.find((c) => c.id === selectedCustomerId) || customers[0];
 
@@ -108,54 +132,76 @@ export default function InboxPage() {
         description="Monitor real-time DM conversations, toggle human takeover, and inspect lead memory."
       />
 
+      {/* Sync Status Banner */}
+      {syncStatus && (
+        <div className="bg-zinc-900 border-b border-zinc-800 px-6 py-2 text-xs text-emerald-400 font-mono flex items-center justify-between">
+          <span>{syncStatus}</span>
+        </div>
+      )}
+
       <div className="flex-1 flex overflow-hidden">
         {/* Left Column: Real-time Conversations List */}
         <div className="w-80 bg-[#0c0c0e] border-r border-[#27272a] flex flex-col h-full">
           <div className="p-3.5 border-b border-[#27272a] flex items-center justify-between">
             <span className="text-xs font-semibold text-zinc-300">Active Conversations ({customers.length})</span>
-            <button onClick={loadCustomers} className="p-1 rounded text-zinc-400 hover:text-white hover:bg-zinc-800">
-              <RefreshCw className="w-3.5 h-3.5" />
-            </button>
+            <div className="flex items-center space-x-1">
+              <button
+                onClick={handleSyncInstagramChats}
+                disabled={syncing}
+                title="Fetch Live Chats from Instagram API"
+                className="p-1 rounded text-zinc-400 hover:text-white hover:bg-zinc-800 flex items-center gap-1 text-[11px] font-medium"
+              >
+                <DownloadCloud className="w-3.5 h-3.5 text-blue-400" />
+                <span>{syncing ? "Syncing..." : "Sync IG"}</span>
+              </button>
+              <button onClick={loadCustomers} title="Refresh Local View" className="p-1 rounded text-zinc-400 hover:text-white hover:bg-zinc-800">
+                <RefreshCw className="w-3.5 h-3.5" />
+              </button>
+            </div>
           </div>
 
           <div className="flex-1 overflow-y-auto divide-y divide-zinc-800/40">
-            {customers.map((cust) => {
-              const isSelected = cust.id === selectedCustomerId;
-              return (
-                <div
-                  key={cust.id}
-                  onClick={() => loadConversation(cust.id)}
-                  className={`p-3.5 cursor-pointer transition flex items-start space-x-3 ${
-                    isSelected ? "bg-[#18181c] border-l-2 border-white" : "hover:bg-[#121215]"
-                  }`}
-                >
-                  <img
-                    src={cust.profilePic || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100"}
-                    alt={cust.username}
-                    className="w-9 h-9 rounded-full border border-zinc-700 object-cover shrink-0 mt-0.5"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-semibold text-white truncate">{cust.fullName || cust.username}</span>
-                      {cust.isHumanTakeover && (
-                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30">
-                          HUMAN
-                        </span>
-                      )}
+            {customers.length === 0 ? (
+              <div className="p-6 text-center text-xs text-zinc-500 leading-relaxed">
+                No active conversations found. Click <span className="text-zinc-300 font-semibold">"Sync IG"</span> above to pull live chats from Instagram, or send a DM to your Instagram page!
+              </div>
+            ) : (
+              customers.map((cust) => {
+                const isSelected = cust.id === selectedCustomerId;
+                return (
+                  <div
+                    key={cust.id}
+                    onClick={() => loadConversation(cust.id)}
+                    className={`p-3.5 cursor-pointer transition flex items-start space-x-3 ${
+                      isSelected ? "bg-[#18181c] border-l-2 border-white" : "hover:bg-[#121215]"
+                    }`}
+                  >
+                    <div className="w-9 h-9 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center font-bold text-xs text-white shrink-0 mt-0.5">
+                      {cust.username ? cust.username.charAt(0).toUpperCase() : "U"}
                     </div>
-                    <p className="text-[11px] text-zinc-400 truncate mt-0.5">
-                      @{cust.username}
-                    </p>
-                    <div className="flex items-center justify-between mt-2 text-[10px]">
-                      <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-medium">
-                        Score {cust.leadScore}/100
-                      </span>
-                      <span className="text-zinc-500">Instagram DM</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-white truncate">{cust.fullName || cust.username}</span>
+                        {cust.isHumanTakeover && (
+                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30">
+                            HUMAN
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-zinc-400 truncate mt-0.5">
+                        @{cust.username}
+                      </p>
+                      <div className="flex items-center justify-between mt-2 text-[10px]">
+                        <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-medium">
+                          Score {cust.leadScore}/100
+                        </span>
+                        <span className="text-zinc-500">Instagram DM</span>
+                      </div>
                     </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })
+            )}
           </div>
         </div>
 
@@ -166,11 +212,9 @@ export default function InboxPage() {
               {/* Chat Header */}
               <div className="h-14 px-6 border-b border-[#27272a] bg-[#0c0c0e] flex items-center justify-between shrink-0">
                 <div className="flex items-center space-x-3">
-                  <img
-                    src={selectedCustomer.profilePic || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100"}
-                    alt={selectedCustomer.username}
-                    className="w-8 h-8 rounded-full border border-zinc-700 object-cover"
-                  />
+                  <div className="w-8 h-8 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center font-bold text-xs text-white">
+                    {selectedCustomer.username ? selectedCustomer.username.charAt(0).toUpperCase() : "U"}
+                  </div>
                   <div>
                     <div className="text-xs font-semibold text-white flex items-center gap-2">
                       {selectedCustomer.fullName}
@@ -269,7 +313,7 @@ export default function InboxPage() {
             </>
           ) : (
             <div className="flex-1 flex items-center justify-center text-xs text-zinc-500">
-              Select a conversation to start viewing Instagram DMs
+              Select a conversation or click "Sync IG" to load Instagram DM threads
             </div>
           )}
         </div>
@@ -280,11 +324,9 @@ export default function InboxPage() {
             <div>
               <h3 className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Customer Memory</h3>
               <div className="mt-3 flex items-center space-x-3">
-                <img
-                  src={selectedCustomer.profilePic || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100"}
-                  alt={selectedCustomer.username}
-                  className="w-12 h-12 rounded-full border border-zinc-700 object-cover"
-                />
+                <div className="w-12 h-12 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center font-bold text-sm text-white">
+                  {selectedCustomer.username ? selectedCustomer.username.charAt(0).toUpperCase() : "U"}
+                </div>
                 <div>
                   <div className="text-sm font-semibold text-white">{selectedCustomer.fullName}</div>
                   <div className="text-xs text-zinc-400">@{selectedCustomer.username}</div>
@@ -335,7 +377,7 @@ export default function InboxPage() {
                   Technical Requirements
                 </span>
                 <div className="text-zinc-300 p-2.5 rounded bg-[#141417] border border-zinc-800/80 leading-relaxed text-[11px]">
-                  {selectedCustomer.requirements || "Inquired about custom software solution."}
+                  {selectedCustomer.requirements || "Inquired via Instagram DM"}
                 </div>
               </div>
             </div>
