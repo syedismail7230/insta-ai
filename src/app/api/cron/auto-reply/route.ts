@@ -169,6 +169,42 @@ export async function GET(req: NextRequest) {
             pendingCount++;
           }
         }
+      } else if (!isFromCustomer) {
+        // AI Follow-up Engine
+        const lastMsgTime = new Date(latestMsg.created_time).getTime();
+        const hoursPassed = (Date.now() - lastMsgTime) / (1000 * 60 * 60);
+
+        // Follow up if last message was sent between 2 hours ago and 6 days ago (within HUMAN_AGENT tag window)
+        if (hoursPassed >= 2 && hoursPassed <= 144) {
+          const secondMsg = msgList[1];
+          const isSecondMsgFromCustomer = secondMsg && (secondMsg.from?.id === instagramId || secondMsg.from?.username === username);
+
+          // Only follow up if the last message was from AI and the one before was from the customer (prevents double follow-up)
+          if (isSecondMsgFromCustomer) {
+            console.log(`✉️ Generating 24/7 AI Follow-up DM for @${username}...`);
+            const followUpPrompt = `System follow-up trigger: The customer @${username} has not responded to our last message. Please generate a concise, polite follow-up DM (max 2 sentences) checking if they have any questions or need help with custom software or AI solutions.`;
+            const aiResult = await processCustomerDM(followUpPrompt, {
+              name: customer.fullName || customer.username || undefined,
+              budget: customer.budget || undefined,
+              timeline: customer.timeline || undefined,
+              stage: customer.stage,
+            });
+
+            if (aiResult.answer) {
+              const sent = await sendInstagramDM(instagramId, aiResult.answer);
+              if (sent) {
+                await db.insert(messages).values({
+                  id: `msg_followup_${Date.now()}`,
+                  conversationId: convId,
+                  senderType: "ai",
+                  senderId: "zawr_ai",
+                  content: aiResult.answer,
+                });
+                autoRepliedCount++;
+              }
+            }
+          }
+        }
       }
     }
 
