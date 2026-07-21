@@ -20,7 +20,6 @@ export async function GET(req: NextRequest) {
     const baseDomain = isIgToken ? "graph.instagram.com" : "graph.facebook.com";
 
     console.log(`⏰ 24/7 Autonomous Cron Job: Fetching via ${baseDomain}...`);
-
     // 1. Fetch recent threads
     const url = `https://${baseDomain}/v21.0/me/conversations?platform=instagram&limit=5&access_token=${token}`;
     const res = await fetch(url);
@@ -131,12 +130,13 @@ export async function GET(req: NextRequest) {
 
           // Update Customer Memory & Lead Score from AI extracted memory
           if (aiResult.extractedMemory) {
+            const memory = aiResult.extractedMemory as NonNullable<typeof aiResult.extractedMemory>;
             const updateData: any = {};
-            if (aiResult.extractedMemory.budget) updateData.budget = aiResult.extractedMemory.budget;
-            if (aiResult.extractedMemory.timeline) updateData.timeline = aiResult.extractedMemory.timeline;
-            if (aiResult.extractedMemory.requirements) updateData.requirements = aiResult.extractedMemory.requirements;
-            if (aiResult.extractedMemory.email) updateData.email = aiResult.extractedMemory.email;
-            if (aiResult.extractedMemory.phone) updateData.phone = aiResult.extractedMemory.phone;
+            if (memory.budget) updateData.budget = memory.budget;
+            if (memory.timeline) updateData.timeline = memory.timeline;
+            if (memory.requirements) updateData.requirements = memory.requirements;
+            if (memory.email) updateData.email = memory.email;
+            if (memory.phone) updateData.phone = memory.phone;
 
             // Auto boost lead score if budget/timeline captured
             if (updateData.budget || updateData.timeline) {
