@@ -36,7 +36,7 @@ export async function sendInstagramDM(recipientId: string, text: string): Promis
     return false;
   }
 
-  // Attempt 1: Standard Response via /me/messages
+  // Attempt 1: Standard Response via /me/messages (Within 24h window)
   const meUrl = `https://graph.facebook.com/v21.0/me/messages?access_token=${pageToken}`;
   const payload = {
     recipient: { id: recipientId },
@@ -60,8 +60,8 @@ export async function sendInstagramDM(recipientId: string, text: string): Promis
     const errJson = await res.json();
     console.warn("⚠️ Standard DM send failed, retrying with HUMAN_AGENT tag:", JSON.stringify(errJson));
 
-    // Attempt 2: Retry with HUMAN_AGENT tag
-    const retryPayload = {
+    // Attempt 2: Retry with HUMAN_AGENT tag (Applies up to 7 days)
+    const humanAgentPayload = {
       recipient: { id: recipientId },
       message: { text },
       messaging_type: "MESSAGE_TAG",
@@ -70,7 +70,7 @@ export async function sendInstagramDM(recipientId: string, text: string): Promis
     const retryRes = await fetch(meUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(retryPayload)
+      body: JSON.stringify(humanAgentPayload)
     });
 
     if (retryRes.ok) {
@@ -79,7 +79,26 @@ export async function sendInstagramDM(recipientId: string, text: string): Promis
       return true;
     }
 
-    // Attempt 3: Retry via Instagram Account Node directly (17841413970700607)
+    // Attempt 3: Retry with ACCOUNT_UPDATE tag
+    const accountUpdatePayload = {
+      recipient: { id: recipientId },
+      message: { text },
+      messaging_type: "MESSAGE_TAG",
+      tag: "ACCOUNT_UPDATE"
+    };
+    const tag3Res = await fetch(meUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(accountUpdatePayload)
+    });
+
+    if (tag3Res.ok) {
+      const tag3Data = await tag3Res.json();
+      console.log("✅ Instagram DM sent with ACCOUNT_UPDATE tag:", tag3Data);
+      return true;
+    }
+
+    // Attempt 4: Direct Instagram Node Retry (17841413970700607)
     const igNodeUrl = `https://graph.facebook.com/v21.0/17841413970700607/messages?access_token=${pageToken}`;
     const igRes = await fetch(igNodeUrl, {
       method: "POST",
@@ -94,7 +113,7 @@ export async function sendInstagramDM(recipientId: string, text: string): Promis
     }
 
     const igErr = await igRes.json();
-    console.error("❌ All Instagram DM send attempts failed:", JSON.stringify(igErr));
+    console.error("❌ All Instagram DM send attempts failed (Thread older than allowed Meta window):", JSON.stringify(igErr));
     return false;
   } catch (error) {
     console.error("❌ Exception sending Instagram DM:", error);
@@ -137,7 +156,6 @@ export function parseInstagramWebhookPayload(body: Record<string, unknown>): Ins
         changesList.forEach((changeItem) => {
           const valueObj = changeItem.value as Record<string, unknown>;
           if (valueObj) {
-            // Check direct message in value
             const msgObj = (valueObj.message || valueObj.messages?.[0]) as Record<string, unknown>;
             const text = (msgObj?.text || valueObj.text) as string;
 
