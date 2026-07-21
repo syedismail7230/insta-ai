@@ -67,14 +67,26 @@ export default function InboxPage() {
     scrollToBottom();
   }, [messages]);
 
-  // Real-time polling for new incoming Instagram DMs every 3 seconds
+  // 24/7 Autonomous background DM reader & auto-replier polling
   useEffect(() => {
-    if (!selectedCustomerId) return;
-    const interval = setInterval(() => {
-      loadConversation(selectedCustomerId);
-    }, 3000);
+    async function runAutoReplyCron() {
+      try {
+        const res = await fetch("/api/cron/auto-reply");
+        if (res.ok) {
+          loadCustomers();
+          if (selectedCustomerId) {
+            loadConversation(selectedCustomerId);
+          }
+        }
+      } catch (err) {
+        // Silent background execution
+      }
+    }
+
+    runAutoReplyCron();
+    const interval = setInterval(runAutoReplyCron, 3000);
     return () => clearInterval(interval);
-  }, [selectedCustomerId, loadConversation]);
+  }, [selectedCustomerId, loadConversation, loadCustomers]);
 
   async function handleSyncInstagramChats() {
     setSyncing(true);

@@ -63,7 +63,6 @@ export async function POST(req: NextRequest) {
 
     // 7. If off-KB, add to pending_questions queue
     if (!aiResult.isAnsweredFromKb) {
-      await db.insert(messages).values();
       await db.insert(pendingQuestions).values({
         id: `pq_auto_${Date.now()}`,
         customerId: customer.id,
