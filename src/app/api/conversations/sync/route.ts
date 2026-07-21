@@ -10,7 +10,7 @@ export async function POST() {
   }
 
   try {
-    const url = `https://graph.facebook.com/v21.0/me/conversations?platform=instagram&limit=10&access_token=${token}`;
+    const url = `https://graph.facebook.com/v21.0/me/conversations?platform=instagram&limit=2&access_token=${token}`;
     const res = await fetch(url);
     const data = await res.json();
 

@@ -14,8 +14,8 @@ async function syncLiveInstagramChats() {
 
   console.log("🔄 Fetching live Instagram chats directly from Meta Graph API for Zawr Industries...");
 
-  // 1. Fetch conversations threads with limit=10
-  const url = `https://graph.facebook.com/v21.0/me/conversations?platform=instagram&limit=10&access_token=${token}`;
+  // 1. Fetch conversations threads with limit=2
+  const url = `https://graph.facebook.com/v21.0/me/conversations?platform=instagram&limit=2&access_token=${token}`;
 
   try {
     const res = await fetch(url);
