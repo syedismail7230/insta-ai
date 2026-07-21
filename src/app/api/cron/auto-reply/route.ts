@@ -136,9 +136,10 @@ export async function GET(req: NextRequest) {
           .orderBy(desc(messages.createdAt))
           .limit(1);
 
-        const isLastMsgFromCustomer = lastDbMsgs[0]?.senderType === "customer";
+        const isLastMsgFromCustomer = lastDbMsgs.length === 0 || lastDbMsgs[0]?.senderType === "customer";
 
-        if (isLastMsgFromCustomer) {   // Execute AI Engine
+        if (isLastMsgFromCustomer) {
+          // Execute AI Engine
           console.log(`🤖 24/7 Auto-Replying to @${username}: "${latestMsg.message}"`);
           const aiResult = await processCustomerDM(latestMsg.message, {
             name: customer.fullName || customer.username || undefined,
