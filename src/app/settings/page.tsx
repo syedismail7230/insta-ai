@@ -15,6 +15,7 @@ import {
   ShieldAlert,
   Copy,
   Check,
+  RefreshCw,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -30,6 +31,8 @@ export default function SettingsPage() {
     openaiModel: "gpt-4o-mini",
     openrouterModel: "anthropic/claude-3.5-haiku",
     fallbackMessage: "Thanks for reaching out to Zawr Industries! That's a specialized technical query—let me double-check the exact specifications with our senior solution architect and get right back to you here in DM!",
+    geminiApiKey: "",
+    groqApiKey: "",
   });
 
   const [linksList, setLinksList] = useState<any[]>([]);
@@ -38,10 +41,30 @@ export default function SettingsPage() {
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [copiedWebhook, setCopiedWebhook] = useState(false);
 
+  const [healthStatus, setHealthStatus] = useState<any>({
+    gemini: { status: "checking", message: "Verifying credentials..." },
+    groq: { status: "checking", message: "Verifying credentials..." }
+  });
+
   useEffect(() => {
     loadSettings();
     loadLinks();
+    loadHealth();
   }, []);
+
+  async function loadHealth() {
+    try {
+      const res = await fetch("/api/settings/health");
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.health) {
+          setHealthStatus(data.health);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to load health status:", err);
+    }
+  }
 
   async function loadSettings() {
     try {
@@ -80,6 +103,8 @@ export default function SettingsPage() {
       if (res.ok) {
         setSavedSuccess(true);
         setTimeout(() => setSavedSuccess(false), 3000);
+        // Refresh health check state with the new keys
+        loadHealth();
       }
     } catch (err) {
       console.error("Failed to save settings:", err);
@@ -213,6 +238,101 @@ export default function SettingsPage() {
                     onChange={(e) => setSettings({ ...settings, groqModel: e.target.value })}
                     className="w-full px-3 py-2 rounded-lg bg-[#18181c] border border-zinc-800 text-white font-mono text-xs focus:outline-none"
                   />
+                </div>
+              </div>
+
+              {/* API Keys Configuration */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs pt-4 border-t border-zinc-800">
+                <div>
+                  <label className="block text-zinc-400 font-medium mb-1 flex items-center gap-1">
+                    <Key className="w-3.5 h-3.5 text-zinc-500" />
+                    <span>Gemini API Key (Custom Override)</span>
+                  </label>
+                  <input
+                    type="password"
+                    placeholder="Enter Custom Gemini API Key (starts with AIzaSy)"
+                    value={settings.geminiApiKey || ""}
+                    onChange={(e) => setSettings({ ...settings, geminiApiKey: e.target.value })}
+                    className="w-full px-3 py-2 rounded-lg bg-[#18181c] border border-zinc-800 text-white font-mono text-xs focus:outline-none"
+                  />
+                  <p className="text-[10px] text-zinc-500 mt-1">
+                    Leave blank to use default system keys. Start with "AIzaSy" from Google AI Studio.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-zinc-400 font-medium mb-1 flex items-center gap-1">
+                    <Key className="w-3.5 h-3.5 text-zinc-500" />
+                    <span>Groq API Key (Custom Override)</span>
+                  </label>
+                  <input
+                    type="password"
+                    placeholder="Enter Custom Groq API Key"
+                    value={settings.groqApiKey || ""}
+                    onChange={(e) => setSettings({ ...settings, groqApiKey: e.target.value })}
+                    className="w-full px-3 py-2 rounded-lg bg-[#18181c] border border-zinc-800 text-white font-mono text-xs focus:outline-none"
+                  />
+                  <p className="text-[10px] text-zinc-500 mt-1">
+                    Leave blank to use default system keys.
+                  </p>
+                </div>
+              </div>
+
+              {/* Dynamic Key Status & Token Monitoring Panel */}
+              <div className="p-4 rounded-xl bg-[#18181c]/50 border border-zinc-800 space-y-3 text-xs">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-semibold text-white flex items-center gap-1.5">
+                    <Sliders className="w-4 h-4 text-amber-500" />
+                    <span>AI Token & Key Status Monitor</span>
+                  </h4>
+                  <button
+                    type="button"
+                    onClick={loadHealth}
+                    className="text-[10px] text-amber-400 hover:text-white flex items-center gap-1 transition font-medium"
+                  >
+                    <RefreshCw className="w-3 h-3 animate-spin-slow" />
+                    <span>Check Connection Status</span>
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 pt-1">
+                  {/* Gemini status */}
+                  <div className="p-3.5 rounded-lg bg-[#121215] border border-zinc-800 space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-zinc-300">Google Gemini API:</span>
+                      <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wide border ${
+                        healthStatus.gemini.status === "active"
+                          ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                          : healthStatus.gemini.status === "rate_limited"
+                          ? "bg-amber-500/10 text-amber-400 border-amber-500/20 animate-pulse"
+                          : healthStatus.gemini.status === "error"
+                          ? "bg-red-500/10 text-red-400 border-red-500/20"
+                          : "bg-zinc-800 text-zinc-400 border-zinc-700"
+                      }`}>
+                        {healthStatus.gemini.status}
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-zinc-400 leading-normal">{healthStatus.gemini.message}</p>
+                  </div>
+
+                  {/* Groq status */}
+                  <div className="p-3.5 rounded-lg bg-[#121215] border border-zinc-800 space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-zinc-300">Groq Llama API:</span>
+                      <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wide border ${
+                        healthStatus.groq.status === "active"
+                          ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                          : healthStatus.groq.status === "rate_limited"
+                          ? "bg-amber-500/10 text-amber-400 border-amber-500/20 animate-pulse"
+                          : healthStatus.groq.status === "error"
+                          ? "bg-red-500/10 text-red-400 border-red-500/20"
+                          : "bg-zinc-800 text-zinc-400 border-zinc-700"
+                      }`}>
+                        {healthStatus.groq.status}
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-zinc-400 leading-normal">{healthStatus.groq.message}</p>
+                  </div>
                 </div>
               </div>
             </div>

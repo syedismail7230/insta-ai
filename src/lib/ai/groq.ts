@@ -8,11 +8,12 @@ export async function generateGroqResponse(
   kbItems: KBItem[],
   linksList: Array<{ title: string; url: string; category: string }>,
   modelName: string = "llama-3.3-70b-versatile",
-  customerContext?: { name?: string; budget?: string; timeline?: string; stage?: string }
+  customerContext?: { name?: string; budget?: string; timeline?: string; stage?: string },
+  customApiKey?: string | null
 ) {
-  const apiKey = process.env.GROQ_API_KEY;
+  const apiKey = customApiKey || process.env.GROQ_API_KEY;
   if (!apiKey) {
-    throw new Error("GROQ_API_KEY environment variable is missing.");
+    throw new Error("GROQ_API_KEY is not configured.");
   }
 
   const prompt = buildSystemPrompt(agentName, tone, systemPrompt, kbItems, linksList, customerContext);

@@ -75,6 +75,8 @@ export const aiSettings = pgTable("ai_settings", {
   openrouterModel: text("openrouter_model").default("anthropic/claude-3.5-haiku").notNull(),
   fallbackMessage: text("fallback_message").default("Thanks for reaching out! Let me check with our specialized engineering team at Zawr Industries and get back to you right away.").notNull(),
   qualificationRules: jsonb("qualification_rules"),
+  geminiApiKey: text("gemini_api_key"),
+  groqApiKey: text("groq_api_key"),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 

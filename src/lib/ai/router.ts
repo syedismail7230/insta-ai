@@ -56,8 +56,11 @@ export async function processCustomerDM(
   const provider = settings.activeProvider.toLowerCase();
   console.log(`🤖 Processing DM with AI Provider: ${provider}`);
 
+  const groqKey = settings.groqApiKey || process.env.GROQ_API_KEY;
+  const geminiKey = settings.geminiApiKey || process.env.GEMINI_API_KEY;
+
   try {
-    if (provider === "groq" && process.env.GROQ_API_KEY) {
+    if (provider === "groq" && groqKey) {
       return await generateGroqResponse(
         userQuery,
         settings.agentName,
@@ -66,7 +69,8 @@ export async function processCustomerDM(
         kbRows,
         linkRows,
         settings.groqModel,
-        customerContext
+        customerContext,
+        groqKey
       );
     }
 
@@ -97,7 +101,7 @@ export async function processCustomerDM(
     }
 
     // Default: Try Gemini
-    if (process.env.GEMINI_API_KEY) {
+    if (geminiKey) {
       return await generateGeminiResponse(
         userQuery,
         settings.agentName,
@@ -105,12 +109,13 @@ export async function processCustomerDM(
         settings.systemPrompt,
         kbRows,
         linkRows,
-        customerContext
+        customerContext,
+        geminiKey
       );
     }
 
     // High-speed fallback to Groq if key exists
-    if (process.env.GROQ_API_KEY) {
+    if (groqKey) {
       return await generateGroqResponse(
         userQuery,
         settings.agentName,
@@ -119,14 +124,15 @@ export async function processCustomerDM(
         kbRows,
         linkRows,
         settings.groqModel,
-        customerContext
+        customerContext,
+        groqKey
       );
     }
 
     throw new Error("No AI API Key available");
   } catch (error) {
     console.error(`⚠️ Error with AI provider ${provider}, executing high-performance Groq fallback:`, error);
-    if (process.env.GROQ_API_KEY) {
+    if (groqKey) {
       try {
         return await generateGroqResponse(
           userQuery,
@@ -136,7 +142,8 @@ export async function processCustomerDM(
           kbRows,
           linkRows,
           "llama-3.3-70b-versatile",
-          customerContext
+          customerContext,
+          groqKey
         );
       } catch (groqError) {
         console.error("❌ Groq fallback failed:", groqError);

@@ -39,6 +39,8 @@ export async function POST(req: NextRequest) {
       openaiModel,
       openrouterModel,
       fallbackMessage,
+      geminiApiKey,
+      groqApiKey,
     } = body;
 
     const [updated] = await db
@@ -54,6 +56,8 @@ export async function POST(req: NextRequest) {
         openaiModel: openaiModel || "gpt-4o-mini",
         openrouterModel: openrouterModel || "anthropic/claude-3.5-haiku",
         fallbackMessage: fallbackMessage || "Thanks for reaching out! Let me check with our specialized engineering team at Zawr Industries and get right back to you shortly.",
+        geminiApiKey: geminiApiKey || null,
+        groqApiKey: groqApiKey || null,
         updatedAt: new Date(),
       })
       .onConflictDoUpdate({
@@ -68,6 +72,8 @@ export async function POST(req: NextRequest) {
           openaiModel,
           openrouterModel,
           fallbackMessage,
+          geminiApiKey,
+          groqApiKey,
           updatedAt: new Date(),
         },
       })
