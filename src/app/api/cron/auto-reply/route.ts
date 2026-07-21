@@ -20,8 +20,24 @@ export async function GET(req: NextRequest) {
     const baseDomain = isIgToken ? "graph.instagram.com" : "graph.facebook.com";
 
     console.log(`⏰ 24/7 Autonomous Cron Job: Fetching via ${baseDomain}...`);
-    // 1. Fetch recent threads
-    const url = `https://${baseDomain}/v21.0/me/conversations?platform=instagram&limit=5&access_token=${token}`;
+
+    // Fetch active Page/User details dynamically to filter out self from participants
+    let myId = "";
+    let myUsername = "";
+    try {
+      const meRes = await fetch(`https://${baseDomain}/v21.0/me?fields=id,username&access_token=${token}`);
+      const meData = await meRes.json();
+      myId = meData.id || "";
+      myUsername = meData.username || "";
+    } catch (err) {
+      console.error("Failed to fetch /me details:", err);
+    }
+
+    const myUsernames = new Set(["zawr_industries", myUsername?.toLowerCase()].filter(Boolean));
+    const myIds = new Set(["17841413970700607", "27796712339961368", myId].filter(Boolean));
+
+    // 1. Fetch recent threads (increased limit to 30 to process all unread chats)
+    const url = `https://${baseDomain}/v21.0/me/conversations?platform=instagram&limit=30&access_token=${token}`;
     const res = await fetch(url);
     const data = await res.json();
 
@@ -41,7 +57,10 @@ export async function GET(req: NextRequest) {
       const detail = await detailRes.json();
 
       const participants = detail.participants?.data || [];
-      const customerParticipant = participants.find((p: any) => p.username !== "zawr_industries" && p.id !== "17841413970700607" && p.id !== "27796712339961368") || participants[0];
+      const customerParticipant = participants.find((p: any) => {
+        const usernameLower = p.username?.toLowerCase();
+        return !myUsernames.has(usernameLower) && !myIds.has(p.id);
+      }) || participants[0];
 
       if (!customerParticipant) continue;
 
