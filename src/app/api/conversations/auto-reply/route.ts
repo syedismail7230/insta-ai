@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
+
+export const dynamic = "force-dynamic";
 import { customers, conversations, messages, pendingQuestions } from "@/db/schema";
 import { eq, desc } from "drizzle-orm";
 import { processCustomerDM } from "@/lib/ai/router";

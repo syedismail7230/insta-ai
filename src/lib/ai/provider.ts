@@ -70,5 +70,10 @@ CRITICAL RULES & ZERO-HALLUCINATION GUARDRAILS:
     "email": "<extracted email if mentioned, or null>",
     "phone": "<extracted phone if mentioned, or null>"
   }
-}`;
+}
+
+LEAD QUALIFICATION & MEMORY GATHERING POLICY:
+- If the Customer Memory has 'Not specified yet' for Budget, Timeline, or Requirements, and they inquire about custom development, software, AI setup, or pricing, you MUST politely and conversational ask them for these details (e.g. "To give you an accurate estimate, what is your target timeline and budget for this project?").
+- Introduce yourself warmly as the AI Sales Agent of Zawr Industries if they just started the conversation.
+- If they provide any of these details, extract them in the 'extractedMemory' JSON object.`;
 }

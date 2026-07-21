@@ -163,7 +163,8 @@ export function parseInstagramWebhookPayload(body: Record<string, unknown>): Ins
         changesList.forEach((changeItem) => {
           const valueObj = changeItem.value as Record<string, unknown>;
           if (valueObj) {
-            const msgObj = (valueObj.message || valueObj.messages?.[0]) as Record<string, unknown>;
+            const messagesArr = valueObj.messages as Array<Record<string, unknown>> | undefined;
+            const msgObj = (valueObj.message || messagesArr?.[0]) as Record<string, unknown>;
             const text = (msgObj?.text || valueObj.text) as string;
 
             if (text && !msgObj?.is_echo) {

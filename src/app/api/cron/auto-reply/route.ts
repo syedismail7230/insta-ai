@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
+
+export const dynamic = "force-dynamic";
 import { customers, conversations, messages, pendingQuestions } from "@/db/schema";
 import { eq, desc } from "drizzle-orm";
 import { processCustomerDM } from "@/lib/ai/router";
@@ -117,6 +119,26 @@ export async function GET(req: NextRequest) {
             timeline: customer.timeline || undefined,
             stage: customer.stage,
           });
+
+          // Update Customer Memory & Lead Score from AI extracted memory
+          if (aiResult.extractedMemory) {
+            const updateData: any = {};
+            if (aiResult.extractedMemory.budget) updateData.budget = aiResult.extractedMemory.budget;
+            if (aiResult.extractedMemory.timeline) updateData.timeline = aiResult.extractedMemory.timeline;
+            if (aiResult.extractedMemory.requirements) updateData.requirements = aiResult.extractedMemory.requirements;
+            if (aiResult.extractedMemory.email) updateData.email = aiResult.extractedMemory.email;
+            if (aiResult.extractedMemory.phone) updateData.phone = aiResult.extractedMemory.phone;
+
+            // Auto boost lead score if budget/timeline captured
+            if (updateData.budget || updateData.timeline) {
+              updateData.leadScore = Math.min(100, (customer.leadScore || 20) + 30);
+              updateData.stage = "qualified";
+            }
+
+            if (Object.keys(updateData).length > 0) {
+              await db.update(customers).set(updateData).where(eq(customers.id, customer.id));
+            }
+          }
 
           if (aiResult.isAnsweredFromKb && aiResult.confidence >= 0.6) {
             // Auto-reply on Instagram
